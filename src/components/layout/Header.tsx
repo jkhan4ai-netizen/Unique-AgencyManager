@@ -12,7 +12,7 @@ import {
 
 export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const { theme, setTheme } = useTheme()
-  const { role, setRole } = useAuth()
+  const { role, logout } = useAuth()
   const { t, i18n } = useTranslation()
 
   return (
@@ -49,11 +49,8 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="glass border-white/10">
-            <DropdownMenuItem onClick={() => setRole("admin")} className="cursor-pointer">
-              {t('header.role_admin')}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setRole("employee")} className="cursor-pointer">
-              {t('header.role_employee')}
+            <DropdownMenuItem onClick={() => logout()} className="cursor-pointer text-destructive focus:text-destructive">
+              Выйти из системы
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
