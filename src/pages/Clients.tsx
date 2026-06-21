@@ -18,6 +18,7 @@ export default function Clients() {
   
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
+  const [telegram, setTelegram] = useState("")
   const [email, setEmail] = useState("")
   const [notes, setNotes] = useState("")
 
@@ -48,6 +49,7 @@ export default function Clients() {
       setOpen(false)
       setName("")
       setPhone("")
+      setTelegram("")
       setEmail("")
       setNotes("")
     },
@@ -61,12 +63,13 @@ export default function Clients() {
       toast.error("Имя клиента обязательно")
       return
     }
-    addClientMutation.mutate({ name, phone, email, notes })
+    addClientMutation.mutate({ name, phone, telegram, email, notes })
   }
 
   const filteredClients = clients.filter((c: any) => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     (c.phone && c.phone.includes(searchTerm)) ||
+    (c.telegram && c.telegram.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (c.email && c.email.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
@@ -110,7 +113,16 @@ export default function Clients() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium">Email</label>
+                  <label className="text-sm font-medium">Telegram (юзернейм или ссылка)</label>
+                  <Input 
+                    value={telegram}
+                    onChange={(e) => setTelegram(e.target.value)}
+                    placeholder="@username" 
+                    className="glass border-white/10" 
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Email (по желанию)</label>
                   <Input 
                     type="email"
                     value={email}
@@ -145,7 +157,7 @@ export default function Clients() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 
-            placeholder="Поиск по имени, телефону или email..." 
+            placeholder="Поиск по имени, телефону или telegram..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9 glass border-white/10"
@@ -192,8 +204,22 @@ export default function Clients() {
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {client.phone && <div>{client.phone}</div>}
+                  {client.telegram && (
+                    <div>
+                      <span className="text-[#0088cc]">Tg: </span>
+                      <a 
+                        href={client.telegram.startsWith('http') ? client.telegram : `https://t.me/${client.telegram.replace('@', '')}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="hover:text-primary transition-colors hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {client.telegram}
+                      </a>
+                    </div>
+                  )}
                   {client.email && <div>{client.email}</div>}
-                  {!client.phone && !client.email && <span className="opacity-50">Нет контактов</span>}
+                  {!client.phone && !client.telegram && !client.email && <span className="opacity-50">Нет контактов</span>}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {new Date(client.created_at).toLocaleDateString("ru-RU")}

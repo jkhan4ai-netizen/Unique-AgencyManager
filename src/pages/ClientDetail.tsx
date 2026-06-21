@@ -4,7 +4,7 @@ import { StatCard } from "@/components/ui/StatCard"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { StatusBadge } from "@/components/ui/StatusBadge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Loader2, Phone, Mail, FileText, ShoppingCart, Banknote, Edit } from "lucide-react"
+import { ArrowLeft, Loader2, Phone, Mail, FileText, ShoppingCart, Banknote, Edit, Send } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useCurrency } from "@/contexts/CurrencyContext"
@@ -29,13 +29,14 @@ export default function ClientDetail() {
   })
 
   const [editOpen, setEditOpen] = useState(false)
-  const [editData, setEditData] = useState({ name: "", phone: "", email: "", notes: "" })
+  const [editData, setEditData] = useState({ name: "", phone: "", telegram: "", email: "", notes: "" })
 
   useEffect(() => {
     if (client) {
       setEditData({
         name: client.name || "",
         phone: client.phone || "",
+        telegram: client.telegram || "",
         email: client.email || "",
         notes: client.notes || ""
       })
@@ -134,7 +135,16 @@ export default function ClientDetail() {
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Email</label>
+                <label className="text-sm font-medium">Telegram (юзернейм или ссылка)</label>
+                <Input 
+                  value={editData.telegram}
+                  onChange={(e) => setEditData({...editData, telegram: e.target.value})}
+                  className="glass border-white/10" 
+                  placeholder="@username"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Email (по желанию)</label>
                 <Input 
                   type="email"
                   value={editData.email}
@@ -172,6 +182,21 @@ export default function ClientDetail() {
             <div className="flex items-center gap-3 text-muted-foreground">
               <Phone className="w-4 h-4 text-primary" />
               <span>{client.phone || "Не указан"}</span>
+            </div>
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <Send className="w-4 h-4 text-[#0088cc]" />
+              {client.telegram ? (
+                <a 
+                  href={client.telegram.startsWith('http') ? client.telegram : `https://t.me/${client.telegram.replace('@', '')}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="hover:text-primary transition-colors hover:underline"
+                >
+                  {client.telegram}
+                </a>
+              ) : (
+                <span>Не указан</span>
+              )}
             </div>
             <div className="flex items-center gap-3 text-muted-foreground">
               <Mail className="w-4 h-4 text-primary" />
