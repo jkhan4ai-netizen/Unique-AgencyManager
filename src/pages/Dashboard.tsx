@@ -21,7 +21,7 @@ export default function Dashboard() {
   const { format, convert, mainCurrency } = useCurrency()
 
   const { data = { finances: { income: 0, expense: 0 }, chartData: [] }, isLoading: isFinancesLoading } = useQuery({
-    queryKey: ['dashboard', 'finances_and_chart'],
+    queryKey: ['dashboard', 'finances_and_chart', mainCurrency],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('transactions')
