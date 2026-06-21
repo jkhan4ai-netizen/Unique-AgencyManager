@@ -71,6 +71,10 @@ export default function Orders() {
         queryClient.invalidateQueries({ queryKey: ['transactions'] })
         queryClient.invalidateQueries({ queryKey: ['dashboard'] })
         toast.success("Статус изменен, доход автоматически записан!")
+      } else if (variables.deleteIncome) {
+        queryClient.invalidateQueries({ queryKey: ['transactions'] })
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+        toast.success("Статус изменен, доход удален!")
       } else {
         toast.success("Заказ обновлен!")
       }
