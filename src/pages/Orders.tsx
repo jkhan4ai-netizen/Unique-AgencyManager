@@ -36,27 +36,33 @@ export default function Orders() {
   })
 
   const updateOrderMutation = useMutation({
-    mutationFn: async ({ id, updates, createIncome }: { id: string, updates: any, createIncome?: boolean }) => {
+    mutationFn: async ({ id, updates, createIncome, deleteIncome }: { id: string, updates: any, createIncome?: boolean, deleteIncome?: boolean }) => {
       // 1. Update order
       const { error } = await supabase.from('orders').update(updates).eq('id', id)
       if (error) throw error
 
-      if (createIncome) {
-        const order = orders.find((o: any) => o.id === id)
-        if (order) {
-          const debt = Math.max(0, order.cost - (order.prepayment || 0))
-          if (debt > 0) {
-            const { error: incErr } = await supabase.from('transactions').insert([{
-              type: 'income',
-              source: `Остаток по заказу: ${order.title}`,
-              amount: debt,
-              currency: order.currency,
-              status: 'completed',
-              category: 'Проекты'
-            }])
-            if (incErr) throw incErr
-          }
+      const order = orders.find((o: any) => o.id === id)
+
+      if (createIncome && order) {
+        const debt = Math.max(0, order.cost - (order.prepayment || 0))
+        if (debt > 0) {
+          const { error: incErr } = await supabase.from('transactions').insert([{
+            type: 'income',
+            source: `Остаток по заказу: ${order.title}`,
+            amount: debt,
+            currency: order.currency,
+            status: 'completed',
+            category: 'Проекты',
+            order_id: id
+          }])
+          if (incErr) throw incErr
         }
+      } else if (deleteIncome && order) {
+        // Find and delete the transaction for the debt if it exists
+        await supabase.from('transactions')
+          .delete()
+          .eq('type', 'income')
+          .ilike('source', `%Остаток по заказу: ${order.title}%`)
       }
     },
     onSuccess: (_, variables) => {
@@ -77,7 +83,8 @@ export default function Orders() {
   const handleStatusChange = (orderId: string, newStatus: string, currentStatus: string) => {
     // If changing to 'completed' from something else, create income
     const createIncome = newStatus === 'completed' && currentStatus !== 'completed'
-    updateOrderMutation.mutate({ id: orderId, updates: { status: newStatus }, createIncome })
+    const deleteIncome = currentStatus === 'completed' && newStatus !== 'completed'
+    updateOrderMutation.mutate({ id: orderId, updates: { status: newStatus }, createIncome, deleteIncome })
   }
 
   const handleNotesChange = (orderId: string, notes: string) => {
