@@ -164,6 +164,39 @@ export function OrderFormDialog({ open, onOpenChange, orderId }: OrderFormDialog
       if (orderId) {
         const { data, error } = await supabase.from('orders').update(payloadToSave).eq('id', orderId).select()
         if (error) throw error
+
+        // Sync prepayment transaction
+        let { data: existingTx } = await supabase.from('transactions').select('id').eq('order_id', orderId).eq('type', 'income').ilike('source', '%Предоплата%').maybeSingle()
+        if (!existingTx) {
+          // fallback for old orders
+          const { data: fallback } = await supabase.from('transactions').select('id').eq('type', 'income').ilike('source', `%${payloadToSave.title}%`).limit(1)
+          if (fallback && fallback.length > 0) {
+            existingTx = fallback[0]
+          }
+        }
+
+        if (existingTx) {
+          if (payloadToSave.prepayment > 0) {
+            await supabase.from('transactions').update({ 
+              amount: payloadToSave.prepayment, 
+              source: `Предоплата по заказу: ${payloadToSave.title}`, 
+              order_id: orderId 
+            }).eq('id', existingTx.id)
+          } else {
+            await supabase.from('transactions').delete().eq('id', existingTx.id)
+          }
+        } else if (payloadToSave.prepayment > 0) {
+          await supabase.from('transactions').insert([{
+            type: 'income',
+            source: `Предоплата по заказу: ${payloadToSave.title}`,
+            amount: payloadToSave.prepayment,
+            currency: payloadToSave.currency,
+            status: 'completed',
+            category: 'Проекты',
+            order_id: orderId
+          }])
+        }
+
         return data
       } else {
         const { data, error } = await supabase.from('orders').insert([{ ...payloadToSave, status: 'pending' }]).select()
@@ -177,7 +210,8 @@ export function OrderFormDialog({ open, onOpenChange, orderId }: OrderFormDialog
             amount: newOrder.prepayment,
             currency: newOrder.currency,
             status: 'completed',
-            category: 'Проекты'
+            category: 'Проекты',
+            order_id: newOrder.id
           }])
         }
         return data

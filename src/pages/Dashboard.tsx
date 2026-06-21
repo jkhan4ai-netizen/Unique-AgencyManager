@@ -15,41 +15,68 @@ import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/lib/supabase"
 import { useCurrency } from "@/contexts/CurrencyContext"
 
-const mockRevenueData = [
-  { name: "Янв", total: 12000000 },
-  { name: "Фев", total: 18000000 },
-  { name: "Мар", total: 15000000 },
-  { name: "Апр", total: 25000000 },
-  { name: "Май", total: 32000000 },
-  { name: "Июн", total: 45000000 },
-]
+const MONTHS = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
 
 export default function Dashboard() {
   const { format, convert, mainCurrency } = useCurrency()
 
-  const { data: finances = { income: 0, expense: 0 }, isLoading: isFinancesLoading } = useQuery({
-    queryKey: ['dashboard', 'finances'],
+  const { data = { finances: { income: 0, expense: 0 }, chartData: [] }, isLoading: isFinancesLoading } = useQuery({
+    queryKey: ['dashboard', 'finances_and_chart'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('transactions')
-        .select('amount, currency, type')
+        .select('amount, currency, type, created_at')
         .eq('status', 'completed')
+        .order('created_at', { ascending: true })
       
       if (error) throw error
 
       let income = 0;
       let expense = 0;
+      
+      const monthlyDataMap: Record<string, { name: string, income: number, expense: number, rawMonth: number, year: number }> = {};
 
       data.forEach(item => {
         const converted = convert(item.amount, item.currency as any, mainCurrency);
+        const date = new Date(item.created_at);
+        const month = date.getMonth();
+        const year = date.getFullYear();
+        const key = `${year}-${month}`;
+
+        if (!monthlyDataMap[key]) {
+          monthlyDataMap[key] = {
+            name: `${MONTHS[month]} ${year}`,
+            income: 0,
+            expense: 0,
+            rawMonth: month,
+            year: year
+          }
+        }
+
         if (item.type === 'income') {
           income += converted;
+          monthlyDataMap[key].income += converted;
         } else if (item.type === 'expense') {
           expense += converted;
+          monthlyDataMap[key].expense += converted;
         }
       });
 
-      return { income, expense };
+      const chartData = Object.values(monthlyDataMap).sort((a, b) => {
+        if (a.year !== b.year) return a.year - b.year;
+        return a.rawMonth - b.rawMonth;
+      });
+
+      // Если данных нет, добавим текущий месяц с нулями для красивого графика
+      if (chartData.length === 0) {
+        const d = new Date();
+        chartData.push({ name: `${MONTHS[d.getMonth()]} ${d.getFullYear()}`, income: 0, expense: 0, rawMonth: d.getMonth(), year: d.getFullYear() })
+      }
+
+      return { 
+        finances: { income, expense },
+        chartData
+      };
     }
   })
 
@@ -65,7 +92,7 @@ export default function Dashboard() {
     }
   })
 
-  const netBalance = finances.income - finances.expense;
+  const netBalance = data.finances.income - data.finances.expense;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -84,13 +111,13 @@ export default function Dashboard() {
         />
         <StatCard 
           title="Общий Доход" 
-          value={isFinancesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : format(finances.income, mainCurrency)} 
+          value={isFinancesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : format(data.finances.income, mainCurrency)} 
           icon={<ArrowUpRight className="w-4 h-4 text-emerald-500" />}
           className="border-emerald-500/10"
         />
         <StatCard 
           title="Общий Расход" 
-          value={isFinancesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : format(finances.expense, mainCurrency)} 
+          value={isFinancesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : format(data.finances.expense, mainCurrency)} 
           icon={<ArrowDownRight className="w-4 h-4 text-destructive" />}
           className="border-destructive/10"
         />
@@ -109,11 +136,15 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="pl-0 h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mockRevenueData} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
+              <AreaChart data={data.chartData} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
                     <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <XAxis 
@@ -142,11 +173,21 @@ export default function Dashboard() {
                 />
                 <Area 
                   type="monotone" 
-                  dataKey="total" 
+                  dataKey="income" 
+                  name="Доход"
                   stroke="hsl(var(--primary))" 
                   strokeWidth={3}
                   fillOpacity={1} 
-                  fill="url(#colorTotal)" 
+                  fill="url(#colorIncome)" 
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="expense" 
+                  name="Расход"
+                  stroke="hsl(var(--destructive))" 
+                  strokeWidth={3}
+                  fillOpacity={1} 
+                  fill="url(#colorExpense)" 
                 />
               </AreaChart>
             </ResponsiveContainer>

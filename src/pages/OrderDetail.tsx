@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge"
 import { StatCard } from "@/components/ui/StatCard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { supabase } from "@/lib/supabase"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCurrency } from "@/contexts/CurrencyContext"
 import { useState, useRef } from "react"
 import { OrderFormDialog } from "@/components/OrderFormDialog"
@@ -16,14 +16,67 @@ export default function OrderDetail() {
   const { orderId } = useParams()
   const navigate = useNavigate()
   const { format, convert, mainCurrency } = useCurrency()
+  const queryClient = useQueryClient()
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
-  const [files, setFiles] = useState<File[]>([])
+  const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const uploadFile = async (file: File) => {
+    if (!orderId) return;
+    try {
+      setIsUploading(true)
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`
+      const filePath = `${orderId}/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('order_attachments')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: publicUrlData } = supabase.storage
+        .from('order_attachments')
+        .getPublicUrl(filePath)
+
+      const newAttachment = {
+        name: file.name,
+        url: publicUrlData.publicUrl,
+        size: file.size,
+        path: filePath
+      }
+
+      // We need current order data to get existing attachments
+      const { data: currentOrder } = await supabase.from('orders').select('attachments').eq('id', orderId).single()
+      const currentAttachments = currentOrder?.attachments || []
+      
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ attachments: [...currentAttachments, newAttachment] })
+        .eq('id', orderId)
+
+      if (updateError) throw updateError
+
+      queryClient.invalidateQueries({ queryKey: ['order_detail', orderId] })
+      toast.success("Файл загружен")
+    } catch (error: any) {
+      toast.error(`Ошибка загрузки: ${error.message}`)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleFiles = async (newFiles: FileList | File[]) => {
+    const fileArray = Array.from(newFiles)
+    for (const file of fileArray) {
+      await uploadFile(file)
+    }
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFiles(prev => [...prev, ...Array.from(e.target.files!)])
+      handleFiles(e.target.files)
     }
   }
 
@@ -47,18 +100,17 @@ export default function OrderDetail() {
 
   // Считаем сколько оплачено по этому заказу из таблицы transactions (если статус completed, мы создавали транзакцию с названием заказа)
   const { data: paidAmount = 0 } = useQuery({
-    queryKey: ['order_paid', orderId, order?.title],
+    queryKey: ['order_paid', orderId],
     queryFn: async () => {
-      if (!order?.title) return 0;
       const { data, error } = await supabase
         .from('transactions')
         .select('amount, currency')
         .eq('type', 'income')
-        .ilike('source', `%${order.title}%`)
+        .eq('order_id', orderId)
       if (error) throw error
-      return data.reduce((sum, t) => sum + convert(t.amount, t.currency as any, order.currency as any), 0)
+      return data.reduce((sum, t) => sum + convert(t.amount, t.currency as any, order?.currency as any || mainCurrency), 0)
     },
-    enabled: !!order
+    enabled: !!orderId
   })
 
   if (isOrderLoading) {
@@ -196,8 +248,8 @@ export default function OrderDetail() {
             </CardHeader>
             <CardContent className="pt-4">
               <div className="flex flex-col gap-3">
-                {files.map((file, idx) => (
-                  <div key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-background/50 border border-white/5 hover:border-primary/30 transition-colors cursor-pointer group">
+                {(order.attachments || []).map((file: any, idx: number) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-background/50 border border-white/5 hover:border-primary/30 transition-colors cursor-pointer group" onClick={() => window.open(file.url, '_blank')}>
                     <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                       <FileText className="w-5 h-5 text-primary" />
                     </div>
@@ -210,14 +262,15 @@ export default function OrderDetail() {
                 
                 <div 
                   className={`flex flex-col items-center gap-2 p-3 py-6 rounded-xl border border-dashed transition-all cursor-pointer justify-center text-muted-foreground
-                    ${isDragging ? 'border-primary bg-primary/10 text-primary scale-[1.02]' : 'border-white/10 hover:border-primary/30 hover:bg-primary/5 hover:text-primary'}`}
+                    ${isDragging ? 'border-primary bg-primary/10 text-primary scale-[1.02]' : 'border-white/10 hover:border-primary/30 hover:bg-primary/5 hover:text-primary'}
+                    ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
                   onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                   onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
                   onDrop={(e) => {
                     e.preventDefault();
                     setIsDragging(false);
                     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                      setFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)])
+                      handleFiles(e.dataTransfer.files)
                     }
                   }}
                   onClick={() => fileInputRef.current?.click()}
@@ -229,9 +282,13 @@ export default function OrderDetail() {
                     multiple 
                     onChange={handleFileSelect} 
                   />
-                  <Upload className={`w-5 h-5 ${isDragging ? 'animate-bounce' : ''}`} />
+                  {isUploading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  ) : (
+                    <Upload className={`w-5 h-5 ${isDragging ? 'animate-bounce' : ''}`} />
+                  )}
                   <span className="text-xs font-medium text-center px-4">
-                    {isDragging ? 'Отпустите файлы здесь...' : 'Нажмите или перетащите файлы сюда'}
+                    {isUploading ? 'Загрузка...' : isDragging ? 'Отпустите файлы здесь...' : 'Нажмите или перетащите файлы сюда'}
                   </span>
                 </div>
               </div>

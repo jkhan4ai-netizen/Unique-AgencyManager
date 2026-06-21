@@ -13,9 +13,10 @@ interface StatCardProps {
     isPositive?: boolean
   }
   className?: string
+  valueClassName?: string
 }
 
-export function StatCard({ title, value, description, icon, trend, className }: StatCardProps) {
+export function StatCard({ title, value, description, icon, trend, className, valueClassName }: StatCardProps) {
   return (
     <Card className={cn("glass overflow-hidden relative", className)}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -25,7 +26,7 @@ export function StatCard({ title, value, description, icon, trend, className }: 
         {icon && <div className="text-muted-foreground">{icon}</div>}
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        <div className={cn("text-2xl font-bold", valueClassName)}>{value}</div>
         {description && (
           <p className="text-xs text-muted-foreground mt-1">{description}</p>
         )}
