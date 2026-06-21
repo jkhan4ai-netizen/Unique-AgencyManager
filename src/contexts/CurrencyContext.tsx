@@ -23,10 +23,34 @@ interface CurrencyContextType {
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined)
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
-  const [mainCurrency, setMainCurrency] = useState<Currency>("UZS")
+  const [mainCurrency, setMainCurrency] = useState<Currency>(() => {
+    return (localStorage.getItem("mainCurrency") as Currency) || "UZS"
+  })
   const [rates, setRates] = useState<CurrencyRates>({ USD: 12600, RUB: 135, UZS: 1 })
-  const [isManualRates, setIsManualRates] = useState(false)
-  const [manualRates, setManualRates] = useState({ USD: 12600, RUB: 135 })
+  const [isManualRates, setIsManualRates] = useState(() => {
+    return localStorage.getItem("isManualRates") === "true"
+  })
+  const [manualRates, setManualRates] = useState(() => {
+    const saved = localStorage.getItem("manualRates")
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch(e) {}
+    }
+    return { USD: 12600, RUB: 135 }
+  })
+
+  useEffect(() => {
+    localStorage.setItem("mainCurrency", mainCurrency)
+  }, [mainCurrency])
+
+  useEffect(() => {
+    localStorage.setItem("isManualRates", String(isManualRates))
+  }, [isManualRates])
+
+  useEffect(() => {
+    localStorage.setItem("manualRates", JSON.stringify(manualRates))
+  }, [manualRates])
 
   useEffect(() => {
     if (isManualRates) {
