@@ -7,7 +7,8 @@ import {
   Calculator, 
   Users, 
   Settings,
-  FileText
+  FileText,
+  UserSquare
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/AuthContext"
@@ -16,6 +17,7 @@ import { useTranslation } from "react-i18next"
 const navItemsKeys = [
   { key: "dashboard", path: "/", icon: LayoutDashboard, adminOnly: false },
   { key: "crm", path: "/crm", icon: Users, adminOnly: false },
+  { key: "clients", path: "/clients", icon: UserSquare, adminOnly: false },
   { key: "planner", path: "/planner", icon: FileText, adminOnly: false },
   { key: "orders", path: "/orders", icon: Briefcase, adminOnly: false },
   { key: "income", path: "/income", icon: DollarSign, adminOnly: true },

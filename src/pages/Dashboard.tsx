@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/ui/PageHeader"
 import { StatCard } from "@/components/ui/StatCard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Banknote, ShoppingCart, Users, Activity, Loader2 } from "lucide-react"
+import { Banknote, ShoppingCart, Users, Activity, Loader2, ArrowUpRight, ArrowDownRight, Wallet } from "lucide-react"
 import { 
   XAxis, 
   YAxis, 
@@ -27,16 +27,29 @@ const mockRevenueData = [
 export default function Dashboard() {
   const { format, convert, mainCurrency } = useCurrency()
 
-  const { data: incomeTotal = 0, isLoading: isIncomeLoading } = useQuery({
-    queryKey: ['dashboard', 'incomeTotal'],
+  const { data: finances = { income: 0, expense: 0 }, isLoading: isFinancesLoading } = useQuery({
+    queryKey: ['dashboard', 'finances'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('transactions')
-        .select('amount, currency')
-        .eq('type', 'income')
+        .select('amount, currency, type')
+        .eq('status', 'completed')
+      
       if (error) throw error
-      // sum up
-      return data.reduce((sum, item) => sum + convert(item.amount, item.currency as any, mainCurrency), 0)
+
+      let income = 0;
+      let expense = 0;
+
+      data.forEach(item => {
+        const converted = convert(item.amount, item.currency as any, mainCurrency);
+        if (item.type === 'income') {
+          income += converted;
+        } else if (item.type === 'expense') {
+          expense += converted;
+        }
+      });
+
+      return { income, expense };
     }
   })
 
@@ -52,34 +65,39 @@ export default function Dashboard() {
     }
   })
 
+  const netBalance = finances.income - finances.expense;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <PageHeader 
         title="Дашборд" 
-        description="Обзор ключевых показателей агентства."
+        description="Обзор ключевых финансовых показателей."
       />
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
-          title="Общая выручка" 
-          value={isIncomeLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : format(incomeTotal, mainCurrency)} 
-          icon={<Banknote className="w-4 h-4 text-primary" />}
+          title="Чистый баланс" 
+          value={isFinancesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : format(netBalance, mainCurrency)} 
+          icon={<Wallet className="w-4 h-4 text-primary" />}
+          className={netBalance >= 0 ? "border-emerald-500/20" : "border-destructive/20"}
+          valueClassName={netBalance >= 0 ? "text-emerald-500" : "text-destructive"}
+        />
+        <StatCard 
+          title="Общий Доход" 
+          value={isFinancesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : format(finances.income, mainCurrency)} 
+          icon={<ArrowUpRight className="w-4 h-4 text-emerald-500" />}
+          className="border-emerald-500/10"
+        />
+        <StatCard 
+          title="Общий Расход" 
+          value={isFinancesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : format(finances.expense, mainCurrency)} 
+          icon={<ArrowDownRight className="w-4 h-4 text-destructive" />}
+          className="border-destructive/10"
         />
         <StatCard 
           title="Активные заказы" 
           value={isOrdersLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : activeOrdersCount} 
           icon={<ShoppingCart className="w-4 h-4 text-primary" />}
-        />
-        <StatCard 
-          title="Сотрудники" 
-          value="15" 
-          icon={<Users className="w-4 h-4 text-primary" />}
-        />
-        <StatCard 
-          title="Эффективность" 
-          value="94%" 
-          icon={<Activity className="w-4 h-4 text-primary" />}
-          trend={{ value: 1.2, label: "к прошлому месяцу", isPositive: true }}
         />
       </div>
 

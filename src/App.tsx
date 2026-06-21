@@ -5,6 +5,8 @@ import { Layout } from "@/components/layout/Layout"
 // Pages
 import Dashboard from "@/pages/Dashboard"
 import CRM from "@/pages/CRM"
+import Clients from "@/pages/Clients"
+import ClientDetail from "@/pages/ClientDetail"
 import Planner from "@/pages/Planner"
 import Orders from "@/pages/Orders"
 import OrderDetail from "@/pages/OrderDetail"
@@ -28,6 +30,8 @@ function App() {
               <Route element={<Layout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/crm" element={<CRM />} />
+                <Route path="/clients" element={<Clients />} />
+                <Route path="/clients/:id" element={<ClientDetail />} />
                 <Route path="/planner" element={<Planner />} />
                 <Route path="/orders" element={<Orders />} />
                 <Route path="/orders/:orderId" element={<OrderDetail />} />
