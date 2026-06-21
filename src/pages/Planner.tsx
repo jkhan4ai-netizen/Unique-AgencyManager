@@ -44,7 +44,7 @@ export default function Planner() {
   const { data: orders = [] } = useQuery({
     queryKey: ['orders_list'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('orders').select('id, title').not('status', 'in', '("completed","completed_unpaid","cancelled")')
+      const { data, error } = await supabase.from('orders').select('id, title').neq('status', 'completed')
       if (error) throw error
       return data
     }

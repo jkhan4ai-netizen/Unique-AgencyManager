@@ -36,59 +36,27 @@ export default function Orders() {
   })
 
   const updateOrderMutation = useMutation({
-    mutationFn: async ({ id, updates, createIncome, deleteIncome }: { id: string, updates: any, createIncome?: boolean, deleteIncome?: boolean }) => {
-      // 1. Update order
+    mutationFn: async ({ id, updates }: { id: string, updates: any }) => {
       const { error } = await supabase.from('orders').update(updates).eq('id', id)
       if (error) throw error
-
-      const order = orders.find((o: any) => o.id === id)
-
-      if (createIncome && order) {
-        const debt = Math.max(0, order.cost - (order.prepayment || 0))
-        if (debt > 0) {
-          const { error: incErr } = await supabase.from('transactions').insert([{
-            type: 'income',
-            source: `Остаток по заказу: ${order.title}`,
-            amount: debt,
-            currency: order.currency,
-            status: 'completed',
-            category: 'Проекты',
-            order_id: id
-          }])
-          if (incErr) throw incErr
-        }
-      } else if (deleteIncome && order) {
-        // Find and delete the transaction for the debt if it exists
-        await supabase.from('transactions')
-          .delete()
-          .eq('type', 'income')
-          .ilike('source', `%Остаток по заказу: ${order.title}%`)
-      }
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] })
-      if (variables.createIncome) {
-        queryClient.invalidateQueries({ queryKey: ['transactions'] })
-        queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-        toast.success("Статус изменен, доход автоматически записан!")
-      } else if (variables.deleteIncome) {
-        queryClient.invalidateQueries({ queryKey: ['transactions'] })
-        queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-        toast.success("Статус изменен, доход удален!")
-      } else {
-        toast.success("Заказ обновлен!")
-      }
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast.success("Данные заказа обновлены!")
     },
     onError: (err: any) => {
       toast.error(`Ошибка обновления: ${err.message}`)
     }
   })
 
-  const handleStatusChange = (orderId: string, newStatus: string, currentStatus: string) => {
-    // If changing to 'completed' from something else, create income
-    const createIncome = newStatus === 'completed' && currentStatus !== 'completed'
-    const deleteIncome = currentStatus === 'completed' && newStatus !== 'completed'
-    updateOrderMutation.mutate({ id: orderId, updates: { status: newStatus }, createIncome, deleteIncome })
+  const handleStatusChange = (orderId: string, newStatus: string) => {
+    updateOrderMutation.mutate({ id: orderId, updates: { status: newStatus } })
+  }
+
+  const handleIsPaidChange = (orderId: string, isPaid: boolean) => {
+    updateOrderMutation.mutate({ id: orderId, updates: { is_paid: isPaid } })
   }
 
   const handleNotesChange = (orderId: string, notes: string) => {
@@ -118,6 +86,7 @@ export default function Orders() {
               <TableHead>Исполнитель</TableHead>
               <TableHead className="w-[200px]">Заметки</TableHead>
               <TableHead className="text-right">Стоимость</TableHead>
+              <TableHead className="text-center w-[80px]">Оплачен</TableHead>
               <TableHead className="text-center w-[160px]">Статус</TableHead>
             </TableRow>
           </TableHeader>
@@ -167,13 +136,23 @@ export default function Orders() {
                   {format(order.cost, order.currency as any)}
                 </TableCell>
                 <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-center">
+                    <input 
+                      type="checkbox" 
+                      checked={order.is_paid || false}
+                      onChange={(e) => handleIsPaidChange(order.id, e.target.checked)}
+                      className="w-4 h-4 accent-emerald-500 bg-white/5 border-white/10 rounded cursor-pointer"
+                      title="Отметить как полностью оплаченный"
+                    />
+                  </div>
+                </TableCell>
+                <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                   <Select 
                     value={order.status} 
-                    onValueChange={(val) => handleStatusChange(order.id, val, order.status)}
+                    onValueChange={(val) => handleStatusChange(order.id, val)}
                   >
                     <SelectTrigger className={`h-8 text-xs w-[140px] ml-auto border-white/10 ${
                       order.status === 'completed' ? 'bg-emerald-500/20 text-emerald-500' :
-                      order.status === 'completed_unpaid' ? 'bg-orange-500/20 text-orange-500' :
                       order.status === 'in_progress' ? 'bg-blue-500/20 text-blue-500' :
                       order.status === 'cancelled' ? 'bg-destructive/20 text-destructive' :
                       'bg-yellow-500/20 text-yellow-500'
@@ -183,8 +162,7 @@ export default function Orders() {
                     <SelectContent className="glass border-white/10">
                       <SelectItem value="pending">Ожидает</SelectItem>
                       <SelectItem value="in_progress">В процессе</SelectItem>
-                      <SelectItem value="completed_unpaid">Завершён (Не оплачен)</SelectItem>
-                      <SelectItem value="completed">Завершён (Оплачен)</SelectItem>
+                      <SelectItem value="completed">Завершён</SelectItem>
                       <SelectItem value="cancelled">Отменён</SelectItem>
                     </SelectContent>
                   </Select>

@@ -93,7 +93,7 @@ export default function ClientDetail() {
 
   // Calculate stats
   const totalOrders = orders.length
-  const completedOrders = orders.filter((o: any) => o.status === 'completed' || o.status === 'completed_unpaid').length
+  const completedOrders = orders.filter((o: any) => o.status === 'completed').length
   const totalRevenue = orders.reduce((sum: number, o: any) => sum + convert(o.cost || 0, o.currency as any, mainCurrency), 0)
 
   return (

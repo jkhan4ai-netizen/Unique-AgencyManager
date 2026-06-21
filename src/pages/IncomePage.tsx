@@ -30,7 +30,7 @@ export default function IncomePage() {
       const { data, error } = await supabase
         .from('orders')
         .select('id, title, cost, prepayment, currency')
-        .not('status', 'in', '("completed","completed_unpaid","cancelled")')
+        .neq('status', 'completed')
       if (error) throw error
       return data
     }
