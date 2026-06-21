@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-export function Header({ onMenuClick }: { onMenuClick: () => void }) {
+export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const { theme, setTheme } = useTheme()
   const { role, setRole } = useAuth()
   const { t, i18n } = useTranslation()

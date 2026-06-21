@@ -244,8 +244,9 @@ export default function Employees() {
                     {emp.email && <div className="text-xs text-muted-foreground">{emp.email}</div>}
                   </TableCell>
                   <TableCell className="text-center">
-                    <StatusBadge status={emp.status === 'pending' ? 'review' : 'completed'} />
-                    {emp.status === 'pending' && <div className="text-[10px] text-yellow-500 mt-1">Ожидает</div>}
+                    <div className={`px-2 py-1 text-[10px] rounded-full inline-flex ${emp.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                      {emp.status === 'pending' ? 'Ожидает' : 'Активный'}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right font-medium text-emerald-500">
                     {format(stats.earned, mainCurrency)}
