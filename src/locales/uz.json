@@ -1,0 +1,20 @@
+{
+  "nav": {
+    "dashboard": "Asosiy oyna",
+    "orders": "Buyurtmalar",
+    "income": "Daromadlar",
+    "expenses": "Xarajatlar",
+    "calculator": "Kalkulyator",
+    "employees": "Xodimlar",
+    "admin": "Admin panel",
+    "crm": "CRM (Mijozlar)",
+    "planner": "Rejalashtiruvchi"
+  },
+  "header": {
+    "role_admin": "Men Adminman (To'liq ruxsat)",
+    "role_employee": "Men Xodimman (Cheklangan)",
+    "role": "Rol",
+    "admin": "Admin",
+    "employee": "Xodim"
+  }
+}
