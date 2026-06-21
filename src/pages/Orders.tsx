@@ -162,6 +162,7 @@ export default function Orders() {
                   >
                     <SelectTrigger className={`h-8 text-xs w-[140px] ml-auto border-white/10 ${
                       order.status === 'completed' ? 'bg-emerald-500/20 text-emerald-500' :
+                      order.status === 'completed_unpaid' ? 'bg-orange-500/20 text-orange-500' :
                       order.status === 'in_progress' ? 'bg-blue-500/20 text-blue-500' :
                       order.status === 'cancelled' ? 'bg-destructive/20 text-destructive' :
                       'bg-yellow-500/20 text-yellow-500'
@@ -171,7 +172,8 @@ export default function Orders() {
                     <SelectContent className="glass border-white/10">
                       <SelectItem value="pending">Ожидает</SelectItem>
                       <SelectItem value="in_progress">В процессе</SelectItem>
-                      <SelectItem value="completed">Завершён</SelectItem>
+                      <SelectItem value="completed_unpaid">Завершён (Не оплачен)</SelectItem>
+                      <SelectItem value="completed">Завершён (Оплачен)</SelectItem>
                       <SelectItem value="cancelled">Отменён</SelectItem>
                     </SelectContent>
                   </Select>

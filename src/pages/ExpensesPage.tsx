@@ -74,6 +74,21 @@ export default function ExpensesPage() {
     }
   })
 
+  const updateCategoryMutation = useMutation({
+    mutationFn: async ({ id, category }: { id: string, category: string }) => {
+      const { error } = await supabase.from('transactions').update({ category }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions', 'expense'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast.success("Категория обновлена")
+    },
+    onError: (err: any) => {
+      toast.error(`Ошибка обновления: ${err.message}`)
+    }
+  })
+
   const addCategoryMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from('expense_categories').insert([{ name: newCatName }])
@@ -267,7 +282,19 @@ export default function ExpensesPage() {
                 </TableCell>
                 <TableCell className="font-medium text-foreground">{item.source}</TableCell>
                 <TableCell className="text-muted-foreground">
-                  <Badge variant="outline" className="glass bg-black/20 text-xs border-white/10 text-muted-foreground font-normal">{item.category}</Badge>
+                  <Select 
+                    value={item.category} 
+                    onValueChange={(val) => updateCategoryMutation.mutate({ id: item.id, category: val })}
+                  >
+                    <SelectTrigger className="h-7 text-xs border-white/10 glass bg-black/20 w-fit gap-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="glass border-white/10">
+                      {categories.map((c: any) => (
+                        <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </TableCell>
                 <TableCell className="text-right font-medium text-destructive">
                   -{format(item.amount, item.currency as any)}

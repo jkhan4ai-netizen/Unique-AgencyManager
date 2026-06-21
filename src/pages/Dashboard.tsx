@@ -86,7 +86,7 @@ export default function Dashboard() {
       const { count, error } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
-        .neq('status', 'completed')
+        .not('status', 'in', '("completed","completed_unpaid","cancelled")')
       if (error) throw error
       return count || 0
     }
