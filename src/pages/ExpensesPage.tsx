@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/lib/supabase"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { Badge } from "@/components/ui/badge"
 
 export default function ExpensesPage() {
   const { convert, format, mainCurrency } = useCurrency()
@@ -22,6 +23,12 @@ export default function ExpensesPage() {
   const [source, setSource] = useState("")
   const [amount, setAmount] = useState<number>(0)
   const [currency, setCurrency] = useState("UZS")
+  const [category, setCategory] = useState("Общее")
+
+  const [newCatOpen, setNewCatOpen] = useState(false)
+  const [newCatName, setNewCatName] = useState("")
+
+  const [filterCategory, setFilterCategory] = useState("all")
 
   const { data: transactions = [], isLoading } = useQuery({
     queryKey: ['transactions', 'expense'],
@@ -31,6 +38,15 @@ export default function ExpensesPage() {
         .select('*')
         .eq('type', 'expense')
         .order('created_at', { ascending: false })
+      if (error) throw error
+      return data
+    }
+  })
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['expense_categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('expense_categories').select('*').order('name')
       if (error) throw error
       return data
     }
@@ -47,10 +63,28 @@ export default function ExpensesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions', 'expense'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       toast.success("Расход успешно добавлен!")
       setOpen(false)
       setSource("")
       setAmount(0)
+    },
+    onError: (err: any) => {
+      toast.error(`Ошибка: ${err.message}`)
+    }
+  })
+
+  const addCategoryMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from('expense_categories').insert([{ name: newCatName }])
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expense_categories'] })
+      setCategory(newCatName)
+      setNewCatOpen(false)
+      setNewCatName("")
+      toast.success("Категория добавлена!")
     },
     onError: (err: any) => {
       toast.error(`Ошибка: ${err.message}`)
@@ -62,13 +96,15 @@ export default function ExpensesPage() {
       type: 'expense',
       source: source || "Новый расход",
       amount: amount || 0,
-      currency: "UZS",
-      category: "Общее",
+      currency,
+      category,
       status: "completed"
     })
   }
 
-  const totalExpense = transactions.reduce((sum, item) => sum + convert(item.amount, item.currency as any, mainCurrency), 0)
+  const filteredTransactions = transactions.filter(t => filterCategory === 'all' || t.category === filterCategory)
+
+  const totalExpense = filteredTransactions.reduce((sum, item) => sum + convert(item.amount, item.currency as any, mainCurrency), 0)
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -83,7 +119,7 @@ export default function ExpensesPage() {
                 Добавить расход
               </Button>
             </DialogTrigger>
-            <DialogContent className="glass border-white/10 sm:max-w-[425px]">
+            <DialogContent className="glass border-white/10 sm:max-w-[425px] overflow-y-auto max-h-[90vh]">
               <DialogHeader>
                 <DialogTitle className="text-destructive">Новый расход</DialogTitle>
                 <DialogDescription>
@@ -100,6 +136,7 @@ export default function ExpensesPage() {
                     className="glass border-white/10" 
                   />
                 </div>
+                
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Сумма</label>
                   <div className="flex">
@@ -120,6 +157,25 @@ export default function ExpensesPage() {
                     </Select>
                   </div>
                 </div>
+
+                <div className="grid gap-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium">Категория</label>
+                    <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setNewCatOpen(true)}>
+                      + Новая категория
+                    </Button>
+                  </div>
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger className="glass border-white/10">
+                      <SelectValue placeholder="Выберите" />
+                    </SelectTrigger>
+                    <SelectContent className="glass border-white/10 max-h-[200px]">
+                      {categories.map((c: any) => (
+                        <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="flex justify-end gap-3 mt-4">
                 <Button variant="outline" onClick={() => setOpen(false)}>Отмена</Button>
@@ -133,13 +189,51 @@ export default function ExpensesPage() {
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <StatCard 
-          title="Общая сумма (за все время)" 
-          value={format(totalExpense, mainCurrency)} 
-          icon={<PieChart className="w-4 h-4 text-destructive" />}
-          className="border-destructive/20"
-        />
+      <Dialog open={newCatOpen} onOpenChange={setNewCatOpen}>
+        <DialogContent className="glass border-white/10 sm:max-w-[300px]">
+          <DialogHeader>
+            <DialogTitle>Добавить категорию</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 grid gap-2">
+            <Input 
+              value={newCatName} 
+              onChange={e => setNewCatName(e.target.value)} 
+              placeholder="Название категории" 
+              className="glass border-white/10" 
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setNewCatOpen(false)}>Отмена</Button>
+            <Button onClick={() => addCategoryMutation.mutate()} disabled={addCategoryMutation.isPending}>
+              {addCategoryMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Добавить
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="w-full sm:w-1/3">
+          <StatCard 
+            title={filterCategory === 'all' ? "Общая сумма" : `Сумма по: ${filterCategory}`} 
+            value={format(totalExpense, mainCurrency)} 
+            icon={<PieChart className="w-4 h-4 text-destructive" />}
+            className="border-destructive/20 h-full"
+          />
+        </div>
+        <div className="w-full sm:w-64 self-end sm:self-auto">
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <SelectTrigger className="glass border-white/10 w-full">
+              <SelectValue placeholder="Фильтр по категории" />
+            </SelectTrigger>
+            <SelectContent className="glass border-white/10">
+              <SelectItem value="all">Все категории</SelectItem>
+              {categories.map((c: any) => (
+                <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="rounded-xl border border-white/10 glass overflow-hidden shadow-xl mt-6">
@@ -160,19 +254,21 @@ export default function ExpensesPage() {
                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground mx-auto" />
                 </TableCell>
               </TableRow>
-            ) : transactions.length === 0 ? (
+            ) : filteredTransactions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                   Нет данных
                 </TableCell>
               </TableRow>
-            ) : transactions.map((item) => (
+            ) : filteredTransactions.map((item) => (
               <TableRow key={item.id} className="border-white/5 hover:bg-white/5 transition-colors">
                 <TableCell className="text-muted-foreground">
                   {new Date(item.created_at).toLocaleDateString("ru-RU")}
                 </TableCell>
                 <TableCell className="font-medium text-foreground">{item.source}</TableCell>
-                <TableCell className="text-muted-foreground">{item.category}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  <Badge variant="outline" className="glass bg-black/20 text-xs border-white/10 text-muted-foreground font-normal">{item.category}</Badge>
+                </TableCell>
                 <TableCell className="text-right font-medium text-destructive">
                   -{format(item.amount, item.currency as any)}
                 </TableCell>
@@ -187,3 +283,4 @@ export default function ExpensesPage() {
     </div>
   )
 }
+

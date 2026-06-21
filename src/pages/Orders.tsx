@@ -41,19 +41,21 @@ export default function Orders() {
       const { error } = await supabase.from('orders').update(updates).eq('id', id)
       if (error) throw error
 
-      // 2. Auto-create income transaction if asked
       if (createIncome) {
         const order = orders.find((o: any) => o.id === id)
         if (order) {
-          const { error: incErr } = await supabase.from('transactions').insert([{
-            type: 'income',
-            source: `Оплата по заказу: ${order.title}`,
-            amount: order.cost,
-            currency: order.currency,
-            status: 'completed',
-            category: 'Проекты'
-          }])
-          if (incErr) throw incErr
+          const debt = Math.max(0, order.cost - (order.prepayment || 0))
+          if (debt > 0) {
+            const { error: incErr } = await supabase.from('transactions').insert([{
+              type: 'income',
+              source: `Остаток по заказу: ${order.title}`,
+              amount: debt,
+              currency: order.currency,
+              status: 'completed',
+              category: 'Проекты'
+            }])
+            if (incErr) throw incErr
+          }
         }
       }
     },
