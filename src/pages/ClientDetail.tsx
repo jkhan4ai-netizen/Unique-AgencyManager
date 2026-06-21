@@ -4,10 +4,15 @@ import { StatCard } from "@/components/ui/StatCard"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { StatusBadge } from "@/components/ui/StatusBadge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Loader2, Phone, Mail, FileText, ShoppingCart, Banknote } from "lucide-react"
+import { ArrowLeft, Loader2, Phone, Mail, FileText, ShoppingCart, Banknote, Edit } from "lucide-react"
 import { supabase } from "@/lib/supabase"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useCurrency } from "@/contexts/CurrencyContext"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { toast } from "sonner"
+import { useState, useEffect } from "react"
 
 export default function ClientDetail() {
   const { id } = useParams()
@@ -20,6 +25,38 @@ export default function ClientDetail() {
       const { data, error } = await supabase.from('clients').select('*').eq('id', id).single()
       if (error) throw error
       return data
+    }
+  })
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [editData, setEditData] = useState({ name: "", phone: "", email: "", notes: "" })
+
+  useEffect(() => {
+    if (client) {
+      setEditData({
+        name: client.name || "",
+        phone: client.phone || "",
+        email: client.email || "",
+        notes: client.notes || ""
+      })
+    }
+  }, [client])
+
+  const queryClient = useQueryClient()
+  
+  const updateClientMutation = useMutation({
+    mutationFn: async (updatedClient: any) => {
+      const { error } = await supabase.from('clients').update(updatedClient).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['client', id] })
+      queryClient.invalidateQueries({ queryKey: ['clients'] })
+      toast.success("Данные клиента обновлены")
+      setEditOpen(false)
+    },
+    onError: (err: any) => {
+      toast.error(`Ошибка обновления: ${err.message}`)
     }
   })
 
@@ -60,11 +97,72 @@ export default function ClientDetail() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex items-center gap-4 mb-2">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/clients')} className="rounded-full bg-white/5 hover:bg-white/10">
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <h1 className="text-2xl font-bold">{client.name}</h1>
+      <div className="flex items-center justify-between gap-4 mb-2">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/clients')} className="rounded-full bg-white/5 hover:bg-white/10">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <h1 className="text-2xl font-bold">{client.name}</h1>
+        </div>
+        
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="gap-2 glass">
+              <Edit className="w-4 h-4" />
+              Редактировать
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px] glass border-white/10">
+            <DialogHeader>
+              <DialogTitle>Редактирование клиента</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Имя / Компания *</label>
+                <Input 
+                  value={editData.name}
+                  onChange={(e) => setEditData({...editData, name: e.target.value})}
+                  className="glass border-white/10" 
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Телефон</label>
+                <Input 
+                  value={editData.phone}
+                  onChange={(e) => setEditData({...editData, phone: e.target.value})}
+                  className="glass border-white/10" 
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Email</label>
+                <Input 
+                  type="email"
+                  value={editData.email}
+                  onChange={(e) => setEditData({...editData, email: e.target.value})}
+                  className="glass border-white/10" 
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Заметки</label>
+                <Textarea 
+                  value={editData.notes}
+                  onChange={(e) => setEditData({...editData, notes: e.target.value})}
+                  className="glass border-white/10 resize-none min-h-[100px]" 
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <Button variant="outline" onClick={() => setEditOpen(false)}>Отмена</Button>
+              <Button 
+                onClick={() => updateClientMutation.mutate(editData)} 
+                disabled={updateClientMutation.isPending || !editData.name}
+              >
+                {updateClientMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Сохранить
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

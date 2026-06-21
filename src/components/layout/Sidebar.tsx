@@ -17,7 +17,7 @@ import { useTranslation } from "react-i18next"
 const navItemsKeys = [
   { key: "dashboard", path: "/", icon: LayoutDashboard, adminOnly: false },
   { key: "crm", path: "/crm", icon: Users, adminOnly: false },
-  { key: "clients", path: "/clients", icon: UserSquare, adminOnly: false },
+  { key: "clients", path: "/clients", icon: UserSquare, adminOnly: true },
   { key: "planner", path: "/planner", icon: FileText, adminOnly: false },
   { key: "orders", path: "/orders", icon: Briefcase, adminOnly: false },
   { key: "income", path: "/income", icon: DollarSign, adminOnly: true },
@@ -63,10 +63,10 @@ export function Sidebar() {
       <div className="p-4 border-t border-white/10">
         <div className="flex items-center gap-3 px-3 py-2">
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold shadow-lg shadow-primary/30">
-            AM
+            {role === 'admin' ? 'A' : 'E'}
           </div>
           <div>
-            <p className="text-sm font-medium">Текущий юзер</p>
+            <p className="text-sm font-medium">Текущий профиль</p>
             <p className="text-xs text-muted-foreground capitalize">{role}</p>
           </div>
         </div>

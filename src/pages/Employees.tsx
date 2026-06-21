@@ -26,6 +26,9 @@ export default function Employees() {
   const [advanceAmount, setAdvanceAmount] = useState<number>(0)
   const [advanceCurrency, setAdvanceCurrency] = useState("UZS")
 
+  const [editOpen, setEditOpen] = useState(false)
+  const [editEmp, setEditEmp] = useState<any>(null)
+
   const { data: employees = [], isLoading } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
@@ -87,6 +90,21 @@ export default function Employees() {
     },
     onError: (err: any) => {
       toast.error(`Ошибка: ${err.message}`)
+    }
+  })
+
+  const updateEmployeeMutation = useMutation({
+    mutationFn: async (updatedEmp: any) => {
+      const { error } = await supabase.from('employees').update(updatedEmp).eq('id', editEmp.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      toast.success("Данные сотрудника обновлены!")
+      setEditOpen(false)
+    },
+    onError: (err: any) => {
+      toast.error(`Ошибка обновления: ${err.message}`)
     }
   })
 
@@ -195,11 +213,12 @@ export default function Employees() {
         <Table>
           <TableHeader className="bg-primary/5">
             <TableRow className="border-white/10 hover:bg-transparent">
-              <TableHead>Имя и Роль</TableHead>
+              <TableHead>Сотрудник</TableHead>
+              <TableHead className="text-center">Статус</TableHead>
               <TableHead className="text-right">Заработано</TableHead>
               <TableHead className="text-right">Выплачено</TableHead>
-              <TableHead className="text-right">Баланс (Долг компании)</TableHead>
-              <TableHead className="text-center w-[150px]">Действия</TableHead>
+              <TableHead className="text-right">Баланс</TableHead>
+              <TableHead className="text-center w-[180px]">Действия</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -222,6 +241,11 @@ export default function Employees() {
                   <TableCell>
                     <div className="font-medium text-foreground">{emp.full_name}</div>
                     <div className="text-xs text-muted-foreground capitalize mt-1">{emp.role}</div>
+                    {emp.email && <div className="text-xs text-muted-foreground">{emp.email}</div>}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <StatusBadge status={emp.status === 'pending' ? 'review' : 'completed'} />
+                    {emp.status === 'pending' && <div className="text-[10px] text-yellow-500 mt-1">Ожидает</div>}
                   </TableCell>
                   <TableCell className="text-right font-medium text-emerald-500">
                     {format(stats.earned, mainCurrency)}
@@ -235,18 +259,31 @@ export default function Employees() {
                     </span>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="glass text-xs w-full"
-                      onClick={() => {
-                        setSelectedEmpId(emp.id)
-                        setAdvanceOpen(true)
-                      }}
-                    >
-                      <DollarSign className="w-3 h-3 mr-1" />
-                      Выплатить
-                    </Button>
+                    <div className="flex flex-col gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="glass text-xs w-full"
+                        onClick={() => {
+                          setSelectedEmpId(emp.id)
+                          setAdvanceOpen(true)
+                        }}
+                      >
+                        <DollarSign className="w-3 h-3 mr-1" />
+                        Выплатить
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs w-full text-blue-400 hover:text-blue-300 hover:bg-blue-400/10"
+                        onClick={() => {
+                          setEditEmp(emp)
+                          setEditOpen(true)
+                        }}
+                      >
+                        Настройки
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               )
@@ -291,6 +328,56 @@ export default function Employees() {
             <Button onClick={handleIssueAdvance} disabled={issueAdvanceMutation.isPending}>
               {issueAdvanceMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Подтвердить
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-[425px] glass border-white/10">
+          <DialogHeader>
+            <DialogTitle>Настройки сотрудника</DialogTitle>
+            <DialogDescription>
+              Измените статус или роль пользователя.
+            </DialogDescription>
+          </DialogHeader>
+          {editEmp && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Роль</label>
+                <Select value={editEmp.role} onValueChange={(v) => setEditEmp({...editEmp, role: v})}>
+                  <SelectTrigger className="glass border-white/10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="glass border-white/10">
+                    <SelectItem value="admin">Администратор (Полный доступ)</SelectItem>
+                    <SelectItem value="employee">Сотрудник (Ограниченный доступ)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Статус аккаунта</label>
+                <Select value={editEmp.status} onValueChange={(v) => setEditEmp({...editEmp, status: v})}>
+                  <SelectTrigger className="glass border-white/10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="glass border-white/10">
+                    <SelectItem value="active">Активный (Имеет доступ)</SelectItem>
+                    <SelectItem value="pending">Ожидает (Доступ закрыт)</SelectItem>
+                    <SelectItem value="blocked">Заблокирован (Доступ закрыт)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Отмена</Button>
+            <Button 
+              onClick={() => updateEmployeeMutation.mutate({ role: editEmp.role, status: editEmp.status })} 
+              disabled={updateEmployeeMutation.isPending}
+            >
+              {updateEmployeeMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Сохранить
             </Button>
           </div>
         </DialogContent>
