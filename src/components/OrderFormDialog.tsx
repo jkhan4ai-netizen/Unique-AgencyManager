@@ -223,6 +223,9 @@ export function OrderFormDialog({ open, onOpenChange, orderId }: OrderFormDialog
       queryClient.invalidateQueries({ queryKey: ['order_detail', orderId] })
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       queryClient.invalidateQueries({ queryKey: ['client_orders'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['order_paid', orderId] })
       toast.success(orderId ? "Заказ обновлен!" : "Заказ успешно создан!")
       onOpenChange(false)
     },

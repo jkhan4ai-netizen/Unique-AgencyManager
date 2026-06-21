@@ -22,6 +22,19 @@ export default function IncomePage() {
   const [source, setSource] = useState("")
   const [amount, setAmount] = useState<number>(0)
   const [currency, setCurrency] = useState("UZS")
+  const [selectedOrderId, setSelectedOrderId] = useState<string>("none")
+
+  const { data: activeOrders = [] } = useQuery({
+    queryKey: ['active_orders_for_income'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, title, cost, prepayment, currency')
+        .neq('status', 'completed')
+      if (error) throw error
+      return data
+    }
+  })
 
   const { data: transactions = [], isLoading } = useQuery({
     queryKey: ['transactions', 'income'],
@@ -46,11 +59,13 @@ export default function IncomePage() {
       return data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions', 'income'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       toast.success("Доход успешно добавлен!")
       setOpen(false)
       setSource("")
       setAmount(0)
+      setSelectedOrderId("none")
     },
     onError: (err: any) => {
       toast.error(`Ошибка: ${err.message}`)
@@ -62,9 +77,25 @@ export default function IncomePage() {
       type: 'income',
       source: source || "Новый доход",
       amount: amount || 0,
-      currency: "UZS",
-      status: "completed"
+      currency: currency,
+      status: "completed",
+      order_id: selectedOrderId !== "none" ? selectedOrderId : null
     })
+  }
+
+  const handleOrderChange = (orderId: string) => {
+    setSelectedOrderId(orderId)
+    if (orderId !== "none") {
+      const order = activeOrders.find(o => o.id === orderId)
+      if (order) {
+        setSource(`Оплата по заказу: ${order.title}`)
+        setAmount(Math.max(0, order.cost - (order.prepayment || 0)))
+        setCurrency(order.currency || "UZS")
+      }
+    } else {
+      setSource("")
+      setAmount(0)
+    }
   }
 
   // Calculate total in main currency
@@ -91,6 +122,22 @@ export default function IncomePage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Привязать к заказу</label>
+                  <Select value={selectedOrderId} onValueChange={handleOrderChange}>
+                    <SelectTrigger className="glass border-white/10">
+                      <SelectValue placeholder="Без заказа" />
+                    </SelectTrigger>
+                    <SelectContent className="glass border-white/10">
+                      <SelectItem value="none">Без заказа (просто доход)</SelectItem>
+                      {activeOrders.map(order => (
+                        <SelectItem key={order.id} value={order.id}>
+                          {order.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Источник</label>
                   <Input 
